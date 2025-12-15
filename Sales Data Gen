@@ -1,0 +1,276 @@
+# 🧪 Synthetic Sales Data Generator
+
+> **Season + Trend + Cohort Repurchase (Production‑grade concept)**
+> Designed for BI / Power BI / Cohort & Retention analysis
+
+---
+
+## 🎯 Purpose
+
+This project regenerates **realistic synthetic sales data** that behaves like a real business:
+
+* 📈 **Trend**: Business grows year‑over‑year (YoY)
+* 🌊 **Seasonality**: Monthly ups & downs (Q4 peak, weak months)
+* 🔁 **Cohort Repurchase**: Customers return over time, not all at once
+* 🎲 **Controlled Randomness**: Data looks organic, not fake
+
+The output is suitable for:
+
+* Cohort retention analysis
+* YoY / MoM analysis
+* Stock speed & inventory simulation
+* BI interview demos & portfolios
+
+---
+
+## 🧠 High‑Level Idea
+
+> "Customers start in different months, buy with different intensity, and return over time.
+> The business grows, fluctuates seasonally, and never behaves perfectly smoothly."
+
+This generator intentionally avoids:
+
+* Flat YoY growth
+* All customers buying forever
+* One product dominating all sales
+
+---
+
+## 🧱 Data Flow Overview
+
+```
+Customer Pool
+   ↓
+Customer Cohort (first purchase)
+   ↓
+Order Frequency (HEAVY / NORMAL)
+   ↓
+Month Selection (Season + Trend + Noise)
+   ↓
+Sale Date Generation (Cohort‑aware)
+   ↓
+Sales Table
+   ↓
+Product Bag Sampling (80/20)
+   ↓
+Sale Items Table
+```
+
+---
+
+## STEP 0️⃣ Clear Existing Data
+
+```sql
+TRUNCATE TABLE sale_items, sales RESTART IDENTITY;
+```
+
+Ensures reproducible regeneration and clean IDs.
+
+---
+
+## STEP 1️⃣ Define Business Parameters
+
+```sql
+growth_2024 = +12%
+growth_2025 = +8%
+noise_sd    = 0.18
+```
+
+| Parameter   | Meaning                              |
+| ----------- | ------------------------------------ |
+| growth_2024 | Avg growth of 2024 vs 2023           |
+| growth_2025 | Avg growth of 2025 vs 2024           |
+| noise_sd    | Monthly volatility (YoY +/‑ realism) |
+
+> Increase `noise_sd` → more volatile YoY
+> Decrease → smoother business
+
+---
+
+## STEP 2️⃣ Customer Cohort & Order Frequency
+
+Customers are generated from `branch_customer_pool`:
+
+* Each customer gets a **first_purchase_date** (2023–2025)
+* Tier is assigned using **80/20 rule**
+
+| Tier   | Share | Orders |
+| ------ | ----- | ------ |
+| HEAVY  | ~20%  | 12–34  |
+| NORMAL | ~80%  | 2–8    |
+
+This immediately creates:
+
+* Power users
+* Long‑tail customers
+
+---
+
+## STEP 3️⃣ Monthly Weight Engine (Season + Trend + Noise)
+
+Each month receives a weight:
+
+```
+weight = season × trend × noise
+```
+
+### 🌊 Seasonality
+
+* April weak
+* Q4 strongest
+
+### 📈 Trend
+
+* 2024 > 2023
+* 2025 > 2024
+
+### 🎲 Noise
+
+* Log‑normal‑like monthly randomness
+* Produces realistic YoY ups & downs
+
+A cumulative sum creates a **roulette wheel**, so high‑weight months are selected more often.
+
+---
+
+## STEP 4️⃣ Month Selection (Roulette Sampling)
+
+For every order:
+
+* A random number selects a month
+* Probability ∝ monthly weight
+
+Result:
+
+* More orders in strong months
+* Still possible sales in weak months
+
+---
+
+## STEP 5️⃣ Cohort‑Aware Sale Date Generation
+
+To avoid fake‑looking cohorts:
+
+* **70%** of orders happen close to first purchase (0–180 days, early‑biased)
+* **30%** spread wider (0–360 days)
+
+This creates:
+
+* Natural retention decay
+* No artificial flat retention
+
+Sale dates are then **forced into the chosen sale month** so season & trend actually matter.
+
+---
+
+## STEP 6️⃣ Insert SALES
+
+Each sale contains:
+
+* sale_date (month‑aligned)
+* sale_ts (realistic hour)
+* customer_id
+* branch
+
+The result is a time series with:
+
+* Growth
+* Seasonality
+* Cohort behavior
+
+---
+
+## STEP 7️⃣ Product Weight & Bag Sampling (Anti‑Monopoly)
+
+Instead of `ORDER BY random()`:
+
+* Products are placed into a **product bag** based on weight
+* Heavier products appear more often
+* Selection uses deterministic hashing
+
+### Benefits
+
+* Fast
+* Stable
+* No single product dominates
+* Clean 80/20 behavior
+
+---
+
+## STEP 8️⃣ Insert SALE_ITEMS
+
+For each sale:
+
+* 1–5 line items
+* Quantity 1–5
+* Cost & price fluctuate slightly
+
+Sampling logic:
+
+```
+bag_id = hash(sale_id, line_no) % bag_size
+```
+
+---
+
+## ✅ Validation Queries
+
+Check YoY behavior:
+
+```sql
+SELECT ym, rev,
+       (rev - LAG(rev,12) OVER()) / LAG(rev,12) OVER() AS yoy
+FROM monthly_revenue;
+```
+
+Expected:
+
+* YoY alternates + / –
+* Long‑term upward trend remains
+
+---
+
+## 🧠 Why This Works Well for BI
+
+* Cohort analysis behaves realistically
+* YoY charts don’t look fake
+* Retention decays naturally
+* Product mix follows 80/20
+
+Perfect for:
+
+* Power BI demos
+* Interview portfolios
+* Stress‑testing dashboards
+
+---
+
+## 🔧 Tunable Knobs
+
+| Goal                 | Adjust             |
+| -------------------- | ------------------ |
+| Stronger seasonality | season multipliers |
+| Faster growth        | growth_2024 / 2025 |
+| Wilder YoY           | noise_sd           |
+| More loyal users     | HEAVY order range  |
+
+---
+
+## 🧭 Final Note
+
+> This generator is **not random for randomness’ sake**.
+> Every randomness is constrained by business logic.
+
+The result is data that *looks wrong in small ways* — exactly like real data.
+
+---
+
+📌 Ideal companion:
+
+* Customer‑month cohort views
+* Retention matrix
+* Stock speed (90‑day) simulation
+
+---
+
+**Author:** Data Analytics / BI Simulation Project
