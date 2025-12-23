@@ -59,7 +59,7 @@ designed for **Power BI, data analytics, inventory optimization, and automation 
 
 The diagram below summarizes the relationships between all core tables used in the demo datamart.
 
-![HomeDepo Datamart ERD](HomeDepo_ERD.png)
+![HomeDepo Datamart ERD](HomeDepo_ERD-10-dec-25.png)
 
 Key highlights:
 - `fact_sales` joins `sales` and `sale_items` for line-level analytics
